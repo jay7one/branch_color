@@ -1,0 +1,70 @@
+{
+  "name": "branch-color",
+  "displayName": "Branch Color",
+  "description": "Sets the VS Code status bar color based on the current git branch",
+  "version": "0.0.1",
+  "engines": {
+    "vscode": "^1.60.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "configuration": {
+      "title": "Branch Color",
+      "properties": {
+        "branchColor.colors": {
+          "type": "object",
+          "default": {
+            "main": "#007ACC",
+            "master": "#007ACC",
+            "develop": "#28a745",
+            "dev": "#28a745",
+            "staging": "#ffa500",
+            "production": "#dc3545",
+            "prod": "#dc3545"
+          },
+          "description": "Map of branch names to status bar colors (hex format)"
+        },
+        "branchColor.defaultColor": {
+          "type": "string",
+          "default": "#6c757d",
+          "description": "Default status bar color when branch doesn't match any configured branch"
+        },
+        "branchColor.usePatternMatching": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable pattern matching for branch names (e.g., 'feature/*' matches 'feature/xyz')"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "pretest": "npm run compile && npm run lint",
+    "lint": "eslint src --ext ts",
+    "test": "node ./out/test/runTest.js"
+  },
+  "devDependencies": {
+    "@types/glob": "^8.1.0",
+    "@types/mocha": "^10.0.1",
+    "@types/node": "20.x",
+    "@types/vscode": "^1.60.0",
+    "@typescript-eslint/eslint-plugin": "^6.4.1",
+    "@typescript-eslint/parser": "^6.4.1",
+    "@vscode/test-electron": "^2.3.4",
+    "eslint": "^8.47.0",
+    "glob": "^10.3.3",
+    "mocha": "^10.2.0",
+    "typescript": "^5.1.6"
+  },
+  "dependencies": {
+    "simple-git": "^3.19.1"
+  }
+}
