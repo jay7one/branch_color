@@ -1,33 +1,61 @@
 import * as vscode from 'vscode';
 import * as simpleGit from 'simple-git';
 
+let updateTimeout: NodeJS.Timeout | undefined;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let originalColorCustomizations: Record<string, any> | undefined;
+
 export function activate(context: vscode.ExtensionContext) {
     console.log('Branch Color extension is now active');
+
+    // Store original color customizations for restoration on deactivate
+    originalColorCustomizations = vscode.workspace.getConfiguration().get('workbench.colorCustomizations');
 
     // Initial update
     updateStatusBarColor();
 
-    // Watch for git changes
-    const gitWatcher = vscode.workspace.createFileSystemWatcher('**/.git/**');
-    gitWatcher.onDidChange(() => updateStatusBarColor());
-    gitWatcher.onDidCreate(() => updateStatusBarColor());
-    gitWatcher.onDidDelete(() => updateStatusBarColor());
+    // Watch for git HEAD changes (branch switches)
+    const gitWatcher = vscode.workspace.createFileSystemWatcher('**/.git/HEAD');
+    gitWatcher.onDidChange(() => debouncedUpdate());
+    gitWatcher.onDidCreate(() => debouncedUpdate());
+    gitWatcher.onDidDelete(() => debouncedUpdate());
 
     // Watch for configuration changes
-    vscode.workspace.onDidChangeConfiguration(e => {
+    vscode.workspace.onDidChangeConfiguration((e: vscode.ConfigurationChangeEvent) => {
         if (e.affectsConfiguration('branchColor')) {
-            updateStatusBarColor();
+            debouncedUpdate();
         }
     });
 
     // Watch for workspace folder changes
-    vscode.workspace.onDidChangeWorkspaceFolders(() => updateStatusBarColor());
+    vscode.workspace.onDidChangeWorkspaceFolders(() => debouncedUpdate());
 
     context.subscriptions.push(gitWatcher);
 }
 
 export function deactivate() {
-    // Cleanup if needed
+    // Restore original color customizations
+    if (originalColorCustomizations !== undefined) {
+        vscode.workspace.getConfiguration().update(
+            'workbench.colorCustomizations',
+            originalColorCustomizations,
+            vscode.ConfigurationTarget.Workspace
+        );
+    }
+
+    // Clear any pending updates
+    if (updateTimeout) {
+        clearTimeout(updateTimeout);
+    }
+}
+
+function debouncedUpdate() {
+    if (updateTimeout) {
+        clearTimeout(updateTimeout);
+    }
+    updateTimeout = setTimeout(() => {
+        updateStatusBarColor();
+    }, 300);
 }
 
 async function updateStatusBarColor() {
@@ -51,7 +79,7 @@ async function updateStatusBarColor() {
         // Get current branch
         const branch = await git.branchLocal();
         const currentBranch = branch.current;
-        
+
         if (!currentBranch) {
             console.log('No current branch');
             return;
@@ -83,13 +111,18 @@ async function updateStatusBarColor() {
 
         console.log(`Setting status bar color to: ${color}`);
 
-        // Apply the color to the status bar
+        // Apply the color to the status bar while preserving other customizations
+        const existingCustomizations = vscode.workspace.getConfiguration().get('workbench.colorCustomizations') || {};
         // eslint-disable-next-line @typescript-eslint/naming-convention
         await vscode.workspace.getConfiguration().update(
             'workbench.colorCustomizations',
             {
+                ...existingCustomizations,
+                // eslint-disable-next-line @typescript-eslint/naming-convention
                 'statusBar.background': color,
+                // eslint-disable-next-line @typescript-eslint/naming-convention
                 'statusBar.noFolderBackground': color,
+                // eslint-disable-next-line @typescript-eslint/naming-convention
                 'statusBar.debuggingBackground': color
             },
             vscode.ConfigurationTarget.Workspace
@@ -97,6 +130,8 @@ async function updateStatusBarColor() {
 
     } catch (error) {
         console.error('Error updating status bar color:', error);
+        vscode.window.showErrorMessage(`Branch Color: Failed to update status bar color - ${error}`);
+        return;
     }
 }
 
